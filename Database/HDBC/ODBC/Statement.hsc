@@ -825,13 +825,13 @@ bindColToSqlValue pcstmt (bindCol, pStrLen) = do
 bindColToSqlValue' :: SQLHSTMT -> BindCol -> #{type SQLLEN} -> IO SqlValue
 bindColToSqlValue' pcstmt (BindColString buf bufLen col) strLen
   | bufLen >= strLen = do
-      bs <- B.packCStringLen (castPtr buf, fromIntegral strLen)
+      bs <- B.packCStringLen (buf, fromIntegral strLen)
       hdbcTrace $ "bindColToSqlValue BindColString " ++ show bs ++ " " ++ show strLen
       return $ SqlByteString bs
   | otherwise = getColData pcstmt #{const SQL_CHAR} col
 bindColToSqlValue' pcstmt (BindColWString buf bufLen col) strLen
   | bufLen >= strLen = do
-      bs <- peekCWStringLen (buf, fromIntegral strLen)
+      bs <- peekCWStringLen (buf, fromIntegral strLen `quot` wcSize)
       hdbcTrace $ "bindColToSqlValue BindColWString " ++ show bs ++ " " ++ show strLen
       return $ SqlString bs
   | otherwise = getColData pcstmt #{const SQL_CHAR} col
