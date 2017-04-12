@@ -695,9 +695,9 @@ mkBindColWString cstmt col mColSize = do
   let bufLen  = sizeOf (undefined :: CWchar) * (colSize + 1)
   buf     <- mallocBytes bufLen
   pStrLen <- malloc
-  sqlBindCol cstmt col (#{const SQL_C_CHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
+  sqlBindCol cstmt col (#{const SQL_C_WCHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
   return (BindColWString buf (fromIntegral bufLen) col, pStrLen)
-mkBindColWStringEC cstmt col = mkBindColString cstmt col . fmap extendFactor  where
+mkBindColWStringEC cstmt col = mkBindColWString cstmt col . fmap extendFactor  where
   extendFactor sz = sz * ((utf8EncodingMaximum + wcSize - 1) `quot` wcSize)
 mkBindColBit cstmt col mColSize = do
   hdbcTrace "mkBindCol: BindColBit"
