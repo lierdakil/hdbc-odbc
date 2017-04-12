@@ -686,7 +686,7 @@ mkBindColString cstmt col mColSize = do
   let bufLen  = sizeOf (undefined :: CChar) * (colSize + 1)
   buf     <- mallocBytes bufLen
   pStrLen <- malloc
-  sqlBindCol cstmt col (#{const SQL_C_WCHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
+  sqlBindCol cstmt col (#{const SQL_C_CHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
   return (BindColString buf (fromIntegral bufLen) col, pStrLen)
 mkBindColStringEC cstmt col = mkBindColString cstmt col . fmap (* utf8EncodingMaximum)
 mkBindColWString cstmt col mColSize = do
@@ -695,8 +695,13 @@ mkBindColWString cstmt col mColSize = do
   let bufLen  = sizeOf (undefined :: CWchar) * (colSize + 1)
   buf     <- mallocBytes bufLen
   pStrLen <- malloc
-  sqlBindCol cstmt col (#{const SQL_C_CHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
+#ifdef mingw32_HOST_OS
+  sqlBindCol cstmt col (#{const SQL_C_WCHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
   return (BindColWString buf (fromIntegral bufLen) col, pStrLen)
+#else
+  sqlBindCol cstmt col (#{const SQL_C_CHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
+  return (BindColString buf (fromIntegral bufLen) col, pStrLen)
+#endif
 mkBindColWStringEC cstmt col = mkBindColWString cstmt col . fmap extendFactor  where
   extendFactor sz = sz * ((utf8EncodingMaximum + wcSize - 1) `quot` wcSize)
 mkBindColBit cstmt col mColSize = do
@@ -820,15 +825,15 @@ bindColToSqlValue pcstmt (bindCol, pStrLen) = do
 bindColToSqlValue' :: SQLHSTMT -> BindCol -> #{type SQLLEN} -> IO SqlValue
 bindColToSqlValue' pcstmt (BindColString buf bufLen col) strLen
   | bufLen >= strLen = do
-      bs <- peekCWStringLen (castPtr buf, fromIntegral strLen)
+      bs <- B.packCStringLen (castPtr buf, fromIntegral strLen)
       hdbcTrace $ "bindColToSqlValue BindColString " ++ show bs ++ " " ++ show strLen
-      return $ SqlString bs
+      return $ SqlByteString bs
   | otherwise = getColData pcstmt #{const SQL_CHAR} col
 bindColToSqlValue' pcstmt (BindColWString buf bufLen col) strLen
   | bufLen >= strLen = do
-      bs <- B.packCStringLen (castPtr buf, fromIntegral strLen)
+      bs <- peekCWStringLen (buf, fromIntegral strLen)
       hdbcTrace $ "bindColToSqlValue BindColWString " ++ show bs ++ " " ++ show strLen
-      return $ SqlByteString bs
+      return $ SqlString bs
   | otherwise = getColData pcstmt #{const SQL_CHAR} col
 bindColToSqlValue' _ (BindColBit     buf) strLen = do
   bit <- peek buf
