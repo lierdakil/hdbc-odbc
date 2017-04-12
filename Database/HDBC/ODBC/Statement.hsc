@@ -20,6 +20,7 @@ import Database.HDBC.ODBC.Utils
 import Database.HDBC.ODBC.Log
 import Database.HDBC.ODBC.TypeConv
 import Database.HDBC.ODBC.Wrappers
+import Codec.Text.IConv
 
 import Foreign.C.String (castCUCharToChar)
 import Foreign.C.Types
@@ -37,6 +38,7 @@ import Data.Time.LocalTime (TimeOfDay(TimeOfDay), LocalTime(LocalTime))
 import Data.Int
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8 as BUTF8
 import qualified Data.ByteString.Unsafe as B
 import Unsafe.Coerce (unsafeCoerce)
@@ -820,7 +822,9 @@ bindColToSqlValue' pcstmt (BindColString buf bufLen col) strLen
   | bufLen >= strLen = do
       bs <- B.packCStringLen (buf, fromIntegral strLen)
       hdbcTrace $ "bindColToSqlValue BindColString " ++ show bs ++ " " ++ show strLen
-      return $ SqlByteString bs
+      case convertStrictly "CP1251" "UTF-8" $ BL.fromStrict bs of
+        Left bs' -> return $ SqlByteString $ BL.toStrict bs'
+        Right _ -> return $ SqlByteString bs
   | otherwise = getColData pcstmt #{const SQL_CHAR} col
 bindColToSqlValue' pcstmt (BindColWString buf bufLen col) strLen
   | bufLen >= strLen = do

@@ -58,6 +58,7 @@ library
     , time>=1.2.0.3
     , utf8-string
     , bytestring
+    , iconv
   c-sources:
       cbits/hdbc-odbc-helper.c
   include-dirs:
