@@ -686,7 +686,7 @@ mkBindColString cstmt col mColSize = do
   let bufLen  = sizeOf (undefined :: CChar) * (colSize + 1)
   buf     <- mallocBytes bufLen
   pStrLen <- malloc
-  sqlBindCol cstmt col (#{const SQL_C_CHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
+  sqlBindCol cstmt col (#{const SQL_C_WCHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
   return (BindColString buf (fromIntegral bufLen) col, pStrLen)
 mkBindColStringEC cstmt col = mkBindColString cstmt col . fmap (* utf8EncodingMaximum)
 mkBindColWString cstmt col mColSize = do
@@ -695,7 +695,7 @@ mkBindColWString cstmt col mColSize = do
   let bufLen  = sizeOf (undefined :: CWchar) * (colSize + 1)
   buf     <- mallocBytes bufLen
   pStrLen <- malloc
-  sqlBindCol cstmt col (#{const SQL_C_WCHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
+  sqlBindCol cstmt col (#{const SQL_C_CHAR}) (castPtr buf) (fromIntegral bufLen) pStrLen
   return (BindColWString buf (fromIntegral bufLen) col, pStrLen)
 mkBindColWStringEC cstmt col = mkBindColWString cstmt col . fmap extendFactor  where
   extendFactor sz = sz * ((utf8EncodingMaximum + wcSize - 1) `quot` wcSize)
@@ -820,11 +820,9 @@ bindColToSqlValue pcstmt (bindCol, pStrLen) = do
 bindColToSqlValue' :: SQLHSTMT -> BindCol -> #{type SQLLEN} -> IO SqlValue
 bindColToSqlValue' pcstmt (BindColString buf bufLen col) strLen
   | bufLen >= strLen = do
-      bs <- B.packCStringLen (buf, fromIntegral strLen)
+      bs <- peekCWStringLen (castPtr buf, fromIntegral strLen)
       hdbcTrace $ "bindColToSqlValue BindColString " ++ show bs ++ " " ++ show strLen
-      case convertStrictly "CP1251" "UTF-8" $ BL.fromStrict bs of
-        Left bs' -> return $ SqlByteString $ BL.toStrict bs'
-        Right _ -> return $ SqlByteString bs
+      return $ SqlString bs
   | otherwise = getColData pcstmt #{const SQL_CHAR} col
 bindColToSqlValue' pcstmt (BindColWString buf bufLen col) strLen
   | bufLen >= strLen = do
